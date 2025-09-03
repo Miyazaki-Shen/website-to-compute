@@ -1,0 +1,641 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Offline Game Hub — Slice Ninja + Tic Tac Toe + Flappy Bird + Math Quiz</title>
+<style>
+  html,body{height:100%;margin:0;background:linear-gradient(#08121a,#082032);font-family:system-ui;color:#fff;overflow:hidden}
+  canvas{display:block;width:100vw;height:100vh;touch-action:none}
+  .hud{position:fixed;top:10px;left:10px;right:10px;display:flex;justify-content:space-between;pointer-events:none;z-index:5}
+  .box{background:rgba(255,255,255,0.06);padding:6px 10px;border-radius:8px;font-weight:700;pointer-events:auto}
+  .btn{background:#ff8a00;border:none;padding:6px 10px;border-radius:8px;cursor:pointer}
+  .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.5);visibility:hidden;opacity:0;transition:.15s;z-index:10}
+  .modal.show{visibility:visible;opacity:1}
+  .card{background:#fff;color:#08121a;padding:14px;border-radius:10px;text-align:center;min-width:200px;max-width:75%}
+  .actions{margin-top:12px;display:flex;flex-direction:column;gap:10px;align-items:center}
+  .about-text{margin:16px 0;font-size:15px;line-height:1.4}
+  .exit-btn{background:#333;color:#fff}
+
+  /* Home screen */
+  #home{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(#001,#223);z-index:20}
+  #home h1{font-size:28px;margin-bottom:20px}
+  #home .game-list{display:flex;flex-direction:column;gap:12px;margin-top:20px}
+  #home .btn{padding:12px 20px;font-size:18px}
+
+  /* Tic Tac Toe */
+  #tictactoe{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:#111;z-index:15}
+  #tictactoe h2{margin-bottom:15px}
+  .board{display:grid;grid-template-columns:repeat(3,100px);grid-template-rows:repeat(3,100px);gap:5px}
+  .cell{background:#222;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:36px;cursor:pointer}
+  .cell.taken{cursor:not-allowed}
+  #tictactoe .controls{margin-top:15px;display:flex;gap:10px}
+  #tictactoe .status{margin-top:15px;font-size:18px;font-weight:bold}
+
+  /* Flappy Bird */
+  #flappy{position:absolute;inset:0;display:none;background:linear-gradient(#4facfe,#00f2fe);z-index:15;overflow:hidden}
+  #flappy canvas{background:linear-gradient(#4facfe,#00f2fe)}
+  #flappy .hud{justify-content:center;font-size:20px;font-weight:bold}
+  #flappy .btns{position:absolute;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:10px}
+
+  /* Math Quiz */
+  #mathQuiz{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;background:#111;z-index:15}
+  #mathQuiz h2{margin-bottom:15px}
+  #mathQuiz .question{font-size:24px;margin-bottom:15px}
+  #mathQuiz input{padding:8px 12px;font-size:18px;width:100px;text-align:center;border-radius:6px;border:none}
+  #mathQuiz .controls{margin-top:15px;display:flex;gap:10px}
+  #mathQuiz .score{margin-top:15px;font-size:18px;font-weight:bold}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div id="home">
+  <h1>🎮 Offline Game Hub</h1>
+  <div class="game-list">
+    <button class="btn" id="playNinja">🍉 Slice Ninja</button>
+    <button class="btn" id="playTicTacToe">❌⭕ Tic Tac Toe</button>
+    <button class="btn" id="playFlappy">🐦 Flappy Bird</button>
+    <button class="btn" id="playMathQuiz">➕ Math Quiz</button>
+    <button class="btn" id="playMemory">🃏 Memory Cards</button>
+  </div>
+</div>
+
+<!-- GAME: SLICE NINJA -->
+<canvas id="c" style="display:none;"></canvas>
+<div class="hud" id="hud" style="display:none;">
+  <div style="display:flex;gap:8px">
+    <div class="box">Score: <span id="score">0</span></div>
+    <div class="box" id="highBox" style="display:none;">Highest: <span id="highScore">0</span></div>
+  </div>
+  <div style="display:flex;gap:8px">
+    <div class="box">❤️ : <span id="lives">3</span></div>
+    <div class="box" style="background:transparent;box-shadow:none"><button id="start" class="btn">Start</button></div>
+    <div class="box" style="background:transparent;box-shadow:none"><button id="backHome" class="btn">Home</button></div>
+  </div>
+</div>
+
+<!-- Game Over & Pause Modal -->
+<div id="m" class="modal">
+  <div class="card" id="modalCard">
+    <h3 id="mt">Game Over</h3>
+    <p id="mb">Score: 0</p>
+    <p id="newHigh" style="display:none; color:#e67e22; font-weight:bold;">🏆 New Highest Score: 0</p>
+    <div class="actions" id="gameOverActions">
+      <button id="r" class="btn">Play Again</button>
+    </div>
+    <div class="actions" id="pauseActions" style="display:none">
+      <button id="resumeBtn" class="btn">Resume</button>
+      <button id="restartBtn" class="btn">Restart</button>
+      <button id="aboutBtn" class="btn">About this Game</button>
+    </div>
+  </div>
+</div>
+
+<!-- About Modal -->
+<div id="aboutModal" class="modal">
+  <div class="card">
+    <h3>About Slice Ninja</h3>
+    <div class="about-text">
+      Slice Ninja is a fast-paced fruit slicing game 🍉🍎🥭.<br><br>
+      Swipe across the screen to slice juicy fruits and earn points.
+      Avoid slicing bombs 💣 or you'll lose instantly.<br><br>
+      Survive as long as you can, aim for high scores, and unleash your inner ninja skills!
+    </div>
+    <button id="aboutExit" class="btn exit-btn">Got it</button>
+  </div>
+</div>
+
+<!-- GAME: TIC TAC TOE -->
+<div id="tictactoe">
+  <h2>❌ Tic Tac Toe ⭕</h2>
+  <div class="board" id="board"></div>
+  <div class="controls">
+    <button class="btn" id="vsPlayer">👥 Vs Player</button>
+    <button class="btn" id="vsAI">🤖 Vs AI</button>
+    <button class="btn" id="backHomeTTT">Home</button>
+  </div>
+  <div class="status" id="statusTTT">Choose mode to start!</div>
+</div>
+
+<!-- GAME: FLAPPY BIRD -->
+<div id="flappy">
+  <canvas id="flappyCanvas"></canvas>
+  <div class="hud">Score: <span id="flappyScore">0</span></div>
+  <div class="btns">
+    <button class="btn" id="flappyStart">Start</button>
+    <button class="btn" id="backHomeFlappy">Home</button>
+  </div>
+</div>
+
+<!-- GAME: MATH QUIZ -->
+<div id="mathQuiz">
+  <h2>➕ Math Quiz</h2>
+  <div class="question" id="mathQuestion">Question?</div>
+  <input type="number" id="mathAnswer" placeholder="Answer">
+  <div class="controls">
+    <button class="btn" id="submitMath">Submit</button>
+    <button class="btn" id="backHomeMath">Home</button>
+  </div>
+  <div class="score" id="mathScore">Score: 0</div>
+</div>
+
+<!-- GAME: MEMORY CARDS -->
+<div id="memoryGame" style="position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:flex-start;background:#111;z-index:15;padding:20px;">
+  <h2 style="margin-bottom:15px;text-align:center;">🃏 Memory Card Game</h2>
+  <div id="memoryBoard" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(70px,1fr));gap:10px;width:100%;max-width:400px;"></div>
+  <div style="margin-top:20px;display:flex;gap:10px;flex-wrap:wrap;justify-content:center;">
+    <button class="btn" id="restartMemory">Restart</button>
+    <button class="btn" id="backHomeMemory">Home</button>
+  </div>
+  <div style="margin-top:15px;font-size:16px;font-weight:bold;color:#fff;text-align:center;" id="memoryStatus">Matches: 0 / 8</div>
+</div>
+<!-- LOADING SCREEN -->
+<div id="loadingScreen" style="
+  position:fixed;
+  inset:0;
+  background:#08121a;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  color:#fff;
+  font-size:24px;
+  font-weight:bold;
+  z-index:9999;
+  flex-direction:column;
+">
+  <div>Loading Offline Game Hub...</div>
+  <div id="loadingProgress" style="margin-top:20px;font-size:18px;">0%</div>
+</div>
+<script>
+/* =========================
+   HOME LOGIC
+========================= */
+const home=document.getElementById("home");
+const playNinja=document.getElementById("playNinja");
+const playTicTacToe=document.getElementById("playTicTacToe");
+const playFlappy=document.getElementById("playFlappy");
+const playMathQuiz=document.getElementById("playMathQuiz");
+const backHome=document.getElementById("backHome");
+const backHomeTTT=document.getElementById("backHomeTTT");
+const backHomeFlappy=document.getElementById("backHomeFlappy");
+const backHomeMath=document.getElementById("backHomeMath");
+const canvas=document.getElementById("c");
+const hud=document.getElementById("hud");
+const ttt=document.getElementById("tictactoe");
+const flappy=document.getElementById("flappy");
+const mathQuiz=document.getElementById("mathQuiz");
+
+playNinja.addEventListener("click",()=>{ playClick(); home.style.display="none"; canvas.style.display="block"; hud.style.display="flex"; start(); });
+backHome.addEventListener("click",()=>{ playClick(); stopGame(); home.style.display="flex"; canvas.style.display="none"; hud.style.display="none"; });
+playTicTacToe.addEventListener("click",()=>{ playClick(); home.style.display="none"; ttt.style.display="flex"; resetTTT(); });
+backHomeTTT.addEventListener("click",()=>{ playClick(); home.style.display="flex"; ttt.style.display="none"; });
+playFlappy.addEventListener("click",()=>{ playClick(); home.style.display="none"; flappy.style.display="block"; startFlappy(); });
+backHomeFlappy.addEventListener("click",()=>{ playClick(); home.style.display="flex"; flappy.style.display="none"; stopFlappy(); });
+playMathQuiz.addEventListener("click",()=>{ playClick(); home.style.display="none"; mathQuiz.style.display="flex"; startMathQuiz(); });
+backHomeMath.addEventListener("click",()=>{ playClick(); home.style.display="flex"; mathQuiz.style.display="none"; });
+
+/* =========================
+   MATH QUIZ GAME
+========================= */
+const mathQuestion=document.getElementById("mathQuestion");
+const mathAnswer=document.getElementById("mathAnswer");
+const submitMath=document.getElementById("submitMath");
+const mathScoreEl=document.getElementById("mathScore");
+let mathScore=0,currentAnswer=0;
+
+function startMathQuiz(){
+  mathScore=0;
+  mathScoreEl.textContent="Score: "+mathScore;
+  generateQuestion();
+  mathAnswer.value="";
+}
+
+function generateQuestion(){
+  const a=Math.floor(Math.random()*20)+1;
+  const b=Math.floor(Math.random()*20)+1;
+  const ops=["+","-","*"];
+  const op=ops[Math.floor(Math.random()*ops.length)];
+  let questionText="";
+  if(op==="+"){currentAnswer=a+b; questionText=`${a} + ${b} = ?`;}
+  else if(op==="-"){currentAnswer=a-b; questionText=`${a} - ${b} = ?`;}
+  else{currentAnswer=a*b; questionText=`${a} × ${b} = ?`;}
+  mathQuestion.textContent=questionText;
+  mathAnswer.focus();
+}
+
+submitMath.addEventListener("click",()=>{
+  const user=parseInt(mathAnswer.value);
+  if(user===currentAnswer){ mathScore+=10; } else { mathScore-=5; if(mathScore<0)mathScore=0; }
+  mathScoreEl.textContent="Score: "+mathScore;
+  mathAnswer.value="";
+  generateQuestion();
+});
+
+mathAnswer.addEventListener("keydown",e=>{ if(e.key==="Enter") submitMath.click(); });
+
+/* =========================
+   TIC TAC TOE GAME
+========================= */
+const boardEl=document.getElementById("board");
+const statusTTT=document.getElementById("statusTTT");
+const vsPlayerBtn=document.getElementById("vsPlayer");
+const vsAIBtn=document.getElementById("vsAI");
+
+let board=["","","","","","","","",""];
+let currentPlayer="X";
+let gameActive=false;
+let vsAI=false;
+
+function resetTTT(){
+  board=["","","","","","","","",""];
+  currentPlayer="X";
+  gameActive=false;
+  vsAI=false;
+  renderBoard();
+  statusTTT.textContent="Choose mode to start!";
+}
+
+function renderBoard(){
+  boardEl.innerHTML="";
+  board.forEach((cell,i)=>{
+    const div=document.createElement("div");
+    div.className="cell"+(cell?" taken":"");
+    div.textContent=cell;
+    div.addEventListener("click",()=>makeMove(i));
+    boardEl.appendChild(div);
+  });
+}
+
+function makeMove(i){
+  if(!gameActive || board[i]) return;
+  board[i]=currentPlayer;
+  renderBoard();
+  if(checkWin(currentPlayer)){ statusTTT.textContent=currentPlayer+" Wins!"; gameActive=false; return; }
+  if(board.every(c=>c)){ statusTTT.textContent="Draw!"; gameActive=false; return; }
+  currentPlayer=currentPlayer==="X"?"O":"X";
+  statusTTT.textContent=currentPlayer+"'s turn";
+  if(vsAI && currentPlayer==="O" && gameActive){ setTimeout(aiMove,400); }
+}
+
+function aiMove(){
+  let empty=board.map((c,i)=>c?null:i).filter(v=>v!==null);
+  let choice=empty[Math.floor(Math.random()*empty.length)];
+  makeMove(choice);
+}
+
+function checkWin(p){
+  const wins=[[0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6]];
+  return wins.some(combo=>combo.every(i=>board[i]===p));
+}
+
+vsPlayerBtn.addEventListener("click",()=>{ playClick(); resetTTT(); gameActive=true; statusTTT.textContent="X's turn"; });
+vsAIBtn.addEventListener("click",()=>{ playClick(); resetTTT(); gameActive=true; vsAI=true; statusTTT.textContent="X's turn (You vs AI)"; });
+
+/* =========================
+   SLICE NINJA GAME CODE
+   (same as your version)
+========================= */
+const ctx=canvas.getContext('2d');let DPR=1;
+function fit(){DPR=Math.max(1,window.devicePixelRatio||1);canvas.width=innerWidth*DPR;canvas.height=innerHeight*DPR;canvas.style.width=innerWidth+'px';canvas.style.height=innerHeight+'px';ctx.setTransform(DPR,0,0,DPR,0,0);}addEventListener('resize',fit);fit();
+const scoreEl=document.getElementById('score'),livesEl=document.getElementById('lives');const startBtn=document.getElementById('start'),modal=document.getElementById('m'),mt=document.getElementById('mt'),mb=document.getElementById('mb'),restart=document.getElementById('r');const gameOverActions=document.getElementById('gameOverActions'),pauseActions=document.getElementById('pauseActions');const resumeBtn=document.getElementById('resumeBtn'),restartBtn=document.getElementById('restartBtn');const aboutBtn=document.getElementById('aboutBtn'),aboutModal=document.getElementById('aboutModal'),aboutExit=document.getElementById('aboutExit');const highBox=document.getElementById('highBox'),highScoreEl=document.getElementById('highScore');const newHighEl=document.getElementById('newHigh');
+let running=false,paused=false,last=0,spawn=0,difficulty=0;let fruits=[],halves=[],trail=[];let score=0,lives=3;let highestScore=null;
+const EMO=['🍉','🍎','🍊','🍐','🍓','🍇','🍍','🥭'];function rand(a,b){return Math.random()*(b-a)+a}function choose(a){return a[Math.floor(Math.random()*a.length)]}
+const audioCtx=new(window.AudioContext||window.webkitAudioContext)();function playSlice(){const o=audioCtx.createOscillator();const g=audioCtx.createGain();const f=audioCtx.createBiquadFilter();o.type='sawtooth';o.frequency.setValueAtTime(1600,audioCtx.currentTime);o.frequency.exponentialRampToValueAtTime(180,audioCtx.currentTime+0.18);g.gain.setValueAtTime(0.3,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.2);f.type='bandpass';f.frequency.setValueAtTime(800,audioCtx.currentTime);f.Q.value=4;o.connect(f);f.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+0.22);}function playBomb(){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type='sawtooth';o.frequency.value=60;g.gain.value=0.15;o.connect(g);g.connect(audioCtx.destination);o.start();o.frequency.exponentialRampToValueAtTime(6,audioCtx.currentTime+0.3);g.gain.exponentialRampToValueAtTime(0.0001,audioCtx.currentTime+0.45);setTimeout(()=>o.stop(),460);}function playClick(){const o=audioCtx.createOscillator(),g=audioCtx.createGain();o.type="square";o.frequency.value=600;g.gain.setValueAtTime(0.25,audioCtx.currentTime);g.gain.exponentialRampToValueAtTime(0.001,audioCtx.currentTime+0.15);o.connect(g);g.connect(audioCtx.destination);o.start();o.stop(audioCtx.currentTime+0.16);}
+function spawnFruit(){const bomb=Math.random()<0.1;const m=innerWidth*0.15;const f={x:rand(m,innerWidth-m),y:innerHeight+50,vx:rand(-160,160),vy:rand(-920,-520),r:rand(28,42),emoji:bomb?'💣':choose(EMO),bomb,sliced:false};fruits.push(f);}
+function sliceFruit(f){if(f.sliced)return;f.sliced=true;if(f.bomb){playBomb();end('bomb');return;}playSlice();score+=10;scoreEl.textContent=score;halves.push({x:f.x,y:f.y,vx:f.vx-120,vy:f.vy-80,r:f.r,emoji:f.emoji,side:'left',rot:-0.8,life:2.2});halves.push({x:f.x,y:f.y,vx:f.vx+120,vy:f.vy-80,r:f.r,emoji:f.emoji,side:'right',rot:0.8,life:2.2});fruits.splice(fruits.indexOf(f),1);}
+function update(dt){spawn+=dt*1000;difficulty+=dt;if(spawn>Math.max(420,900-difficulty*8)){spawn=0;spawnFruit();if(Math.random()<0.25)spawnFruit();}for(let i=fruits.length-1;i>=0;i--){const f=fruits[i];f.vy+=900*dt;f.x+=f.vx*dt;f.y+=f.vy*dt;if(f.y-f.r>innerHeight+40){if(!f.sliced&&!f.bomb){lives--;livesEl.textContent=lives;if(lives<=0)end('lives');}fruits.splice(i,1);}else if(f.x+f.r<-60||f.x-f.r>innerWidth+60||f.y+f.r<-60){fruits.splice(i,1);}}for(let i=halves.length-1;i>=0;i--){const h=halves[i];h.vy+=900*dt;h.x+=h.vx*dt;h.y+=h.vy*dt;h.rot+=h.vx>0?0.06:-0.06;h.life-=dt;if(h.y-h.r>innerHeight+60||h.life<=0)halves.splice(i,1);}const now=performance.now();trail=trail.filter(t=>now-t.t<300);if(trail.length>=2){for(const f of fruits){if(f.sliced)continue;for(let i=0;i<trail.length-1;i++){const a=trail[i],b=trail[i+1];if(lineIntersectsCircle(a.x,a.y,b.x,b.y,f.x,f.y,f.r*0.9)){sliceFruit(f);break;}}}}}
+function draw(){ctx.clearRect(0,0,innerWidth,innerHeight);for(const f of fruits){ctx.font=(f.r*2.0)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(f.emoji,f.x,f.y);}for(const h of halves){ctx.save();ctx.translate(h.x,h.y);ctx.rotate(h.rot);ctx.beginPath();if(h.side==='left'){ctx.rect(-h.r-10,-h.r-10,h.r+10,h.r*2+20);}else{ctx.rect(0,-h.r-10,h.r+10,h.r*2+20);}ctx.clip();ctx.font=(h.r*2.0)+'px serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(h.emoji,0,0);ctx.restore();}if(trail.length>1){ctx.save();ctx.lineJoin='round';ctx.lineCap='round';for(let i=8;i>0;i--){ctx.strokeStyle=`rgba(0,200,255,${0.05*i})`;ctx.lineWidth=20+i*2;ctx.beginPath();ctx.moveTo(trail[0].x,trail[0].y);for(const p of trail)ctx.lineTo(p.x,p.y);ctx.stroke();}ctx.strokeStyle='rgba(255,255,255,0.9)';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(trail[0].x,trail[0].y);for(let i=1;i<trail.length;i++){const prev=trail[i-1],curr=trail[i];const midX=(prev.x+curr.x)/2+rand(-3,3);const midY=(prev.y+curr.y)/2+rand(-3,3);ctx.lineTo(midX,midY);ctx.lineTo(curr.x,curr.y);}ctx.stroke();ctx.restore();}}
+function lineIntersectsCircle(x1,y1,x2,y2,cx,cy,r){const dx=x2-x1,dy=y2-y1,fx=x1-cx,fy=y1-cy;const a=dx*dx+dy*dy,b=2*(fx*dx+fy*dy),c=fx*fx+fy*fy-r*r;let disc=b*b-4*a*c;if(disc<0)return false;disc=Math.sqrt(disc);const t1=(-b-disc)/(2*a),t2=(-b+disc)/(2*a);return(t1>=0&&t1<=1)||(t2>=0&&t2<=1);}
+function loop(ts){if(!running||paused)return;const dt=Math.min(0.05,(ts-last)/1000);last=ts;update(dt);draw();requestAnimationFrame(loop);}
+function start(){audioResume();score=0;lives=3;fruits=[];halves=[];trail=[];scoreEl.textContent=0;livesEl.textContent=3;newHighEl.style.display="none";mb.style.display="block";running=true;paused=false;last=performance.now();spawn=0;difficulty=0;startBtn.textContent="Menu";requestAnimationFrame(loop);}
+function stopGame(){running=false;paused=false;fruits=[];halves=[];trail=[];startBtn.textContent="Start";}
+function end(reason){running=false;trail=[];mt.textContent=(reason==='bomb')?'💥 BOOM!':'Game Over';let isNewHigh=false;if(highestScore===null||score>highestScore){highestScore=score;isNewHigh=true;}highBox.style.display="inline-block";highScoreEl.textContent=highestScore;if(isNewHigh){mb.style.display="none";newHighEl.textContent="🏆 New Highest Score: "+highestScore;newHighEl.style.display="block";}else{mb.textContent='Score: '+score;mb.style.display="block";newHighEl.style.display="none";}pauseActions.style.display="none";gameOverActions.style.display="flex";showModal();}
+function showModal(){modal.classList.add('show');}function hideModal(){modal.classList.remove('show');}
+function pauseGame(){paused=true;mt.textContent="Game is Paused";mb.style.display="none";newHighEl.style.display="none";gameOverActions.style.display="none";pauseActions.style.display="flex";showModal();}
+function resumeGame(){paused=false;hideModal();requestAnimationFrame(loop);}
+canvas.addEventListener('pointerdown',e=>{if(!running||paused)return;trail=[{x:e.clientX,y:e.clientY,t:performance.now()}];});
+canvas.addEventListener('pointermove',e=>{if(!running||paused||!trail.length)return;trail.push({x:e.clientX,y:e.clientY,t:performance.now()});if(trail.length>18)trail.shift();});
+canvas.addEventListener('pointerup',()=>trail=[]);
+function audioResume(){if(audioCtx.state==='suspended')audioCtx.resume();}
+startBtn.addEventListener('click',()=>{playClick();audioResume();if(!running){start();}else{pauseGame();}});
+restart.addEventListener('click',()=>{playClick();hideModal();start();});
+resumeBtn.addEventListener('click',()=>{playClick();resumeGame();});
+restartBtn.addEventListener('click',()=>{playClick();hideModal();start();});
+aboutBtn.addEventListener('click',()=>{playClick();aboutModal.classList.add('show');});
+aboutExit.addEventListener('click',()=>{playClick();aboutModal.classList.remove('show');});
+/* =========================
+   FLAPPY BIRD CLONE FIXED
+========================= */
+const flappyCanvas=document.getElementById("flappyCanvas");
+const fctx=flappyCanvas.getContext("2d");
+let fW,fH;
+function resizeFlappy(){flappyCanvas.width=innerWidth;flappyCanvas.height=innerHeight;fW=innerWidth;fH=innerHeight;}
+resizeFlappy();addEventListener("resize",resizeFlappy);
+
+let bird,gravity,flapStrength,pipes,pipeGap,pipeWidth,flappyScore,flappyRunning,flappyLoop;
+
+function initFlappy(){
+  bird={x:100,y:fH/2,vy:0,size:28};
+  gravity=0.35;          // smoother gravity
+  flapStrength=-7;        // controllable jump
+  pipes=[];
+  pipeGap=180;            // easier gap
+  pipeWidth=60;
+  flappyScore=0;
+  document.getElementById("flappyScore").textContent=flappyScore;
+}
+
+function drawBird(){
+  fctx.fillStyle="yellow";
+  fctx.beginPath();
+  fctx.arc(bird.x,bird.y,bird.size,0,Math.PI*2);
+  fctx.fill();
+}
+
+function drawPipes(){
+  fctx.fillStyle="green";
+  for(let p of pipes){
+    fctx.fillRect(p.x,0,pipeWidth,p.top);
+    fctx.fillRect(p.x,p.top+pipeGap,pipeWidth,fH-(p.top+pipeGap));
+  }
+}
+
+function updateFlappy(){
+  bird.vy+=gravity;
+  bird.y+=bird.vy;
+
+  if(bird.y+bird.size>fH||bird.y-bird.size<0)endFlappy();
+
+  // spawn pipes
+  if(pipes.length===0||pipes[pipes.length-1].x<fW-250){
+    let top=Math.random()*(fH-pipeGap-100)+50;
+    pipes.push({x:fW,top,scored:false});
+  }
+
+  for(let i=pipes.length-1;i>=0;i--){
+    let p=pipes[i];
+    p.x-=3; // speed
+
+    // check if bird passed pipe for scoring
+    if(!p.scored && bird.x > p.x + pipeWidth){
+      p.scored=true;
+      flappyScore++;
+      document.getElementById("flappyScore").textContent=flappyScore;
+    }
+
+    // collision
+    if(bird.x + bird.size > p.x && bird.x - bird.size < p.x + pipeWidth &&
+      (bird.y - bird.size < p.top || bird.y + bird.size > p.top + pipeGap)){
+      endFlappy();
+    }
+
+    // remove offscreen pipes
+    if(p.x + pipeWidth < 0) pipes.splice(i,1);
+  }
+}
+
+function drawFlappy(){
+  fctx.clearRect(0,0,fW,fH);
+  drawBird();
+  drawPipes();
+}
+
+function loopFlappy(){
+  if(!flappyRunning)return;
+  updateFlappy();
+  drawFlappy();
+  flappyLoop=requestAnimationFrame(loopFlappy);
+}
+
+function startFlappy(){initFlappy();flappyRunning=true;loopFlappy();}
+function stopFlappy(){flappyRunning=false;cancelAnimationFrame(flappyLoop);}
+function endFlappy(){flappyRunning=false;alert("Game Over! Score: "+flappyScore);}
+
+// events
+document.getElementById("flappyStart").addEventListener("click",()=>{playClick();startFlappy();});
+flappyCanvas.addEventListener("click",()=>{if(flappyRunning)bird.vy=flapStrength;});
+document.addEventListener("keydown",e=>{if(flappyRunning && e.code==="Space") bird.vy=flapStrength;});
+
+/* =========================
+   MEMORY CARD GAME WITH TIMER & MODAL
+========================= */
+
+// DOM Elements
+const playMemory = document.getElementById("playMemory");
+const memoryGame = document.getElementById("memoryGame");
+const memoryBoard = document.getElementById("memoryBoard");
+const restartMemory = document.getElementById("restartMemory");
+const backHomeMemory = document.getElementById("backHomeMemory");
+const memoryStatus = document.getElementById("memoryStatus");
+
+// Game variables
+let cards = [];
+let firstCard = null;
+let secondCard = null;
+let matches = 0;
+const emojis = ["🍎","🍊","🍉","🍇","🍌","🍓","🥝","🥭"];
+let timer = null;
+let timeRemaining = 60; // 1 minute countdown
+
+// -------------------------
+// Modal Setup
+// -------------------------
+let memoryModal = document.createElement("div");
+memoryModal.style.position = "fixed";
+memoryModal.style.inset = "0";
+memoryModal.style.background = "rgba(0,0,0,0.8)";
+memoryModal.style.display = "none";
+memoryModal.style.flexDirection = "column";
+memoryModal.style.alignItems = "center";
+memoryModal.style.justifyContent = "center";
+memoryModal.style.zIndex = "9999";
+memoryModal.style.color = "#fff";
+memoryModal.style.fontSize = "24px";
+memoryModal.style.fontWeight = "bold";
+
+let modalMessage = document.createElement("div");
+modalMessage.style.marginBottom = "20px";
+memoryModal.appendChild(modalMessage);
+
+let modalButtons = document.createElement("div");
+modalButtons.style.display = "flex";
+modalButtons.style.gap = "10px";
+
+let modalRestart = document.createElement("button");
+modalRestart.textContent = "Restart";
+modalRestart.className = "btn";
+modalRestart.addEventListener("click", () => {
+  memoryModal.style.display = "none";
+  initMemory();
+});
+
+let modalHome = document.createElement("button");
+modalHome.textContent = "Home";
+modalHome.className = "btn";
+modalHome.addEventListener("click", () => {
+  memoryModal.style.display = "none";
+  memoryGame.style.display = "none";
+  home.style.display = "flex";
+  clearInterval(timer);
+});
+
+modalButtons.appendChild(modalRestart);
+modalButtons.appendChild(modalHome);
+memoryModal.appendChild(modalButtons);
+
+document.body.appendChild(memoryModal);
+
+function showMemoryModal(message) {
+  modalMessage.textContent = message;
+  memoryModal.style.display = "flex";
+}
+
+// -------------------------
+// Show Memory Game
+// -------------------------
+playMemory.addEventListener("click", () => {
+  playClick();
+  home.style.display = "none";
+  memoryGame.style.display = "flex";
+  initMemory();
+});
+
+// Back to home
+backHomeMemory.addEventListener("click", () => {
+  playClick();
+  memoryGame.style.display = "none";
+  home.style.display = "flex";
+  clearInterval(timer);
+});
+
+// Restart memory game
+restartMemory.addEventListener("click", () => {
+  playClick();
+  initMemory();
+});
+
+// -------------------------
+// Initialize memory game
+// -------------------------
+function initMemory() {
+  cards = [];
+  firstCard = null;
+  secondCard = null;
+  matches = 0;
+  timeRemaining = 60;
+  memoryStatus.textContent = `Matches: ${matches} / ${emojis.length} | Time: ${timeRemaining}s`;
+
+  // Clear previous timer
+  if (timer) clearInterval(timer);
+
+  // Shuffle and create cards
+  const doubleEmojis = [...emojis, ...emojis].sort(() => Math.random() - 0.5);
+  memoryBoard.innerHTML = "";
+
+  doubleEmojis.forEach((emoji, i) => {
+    const card = document.createElement("div");
+    card.className = "memory-card";
+
+    // Style card
+    card.style.aspectRatio = "1/1";
+    card.style.background = "#222";
+    card.style.borderRadius = "8px";
+    card.style.display = "flex";
+    card.style.alignItems = "center";
+    card.style.justifyContent = "center";
+    card.style.fontSize = "calc(24px + 1vw)";
+    card.style.cursor = "pointer";
+    card.style.userSelect = "none";
+    card.dataset.emoji = emoji;
+    card.dataset.index = i;
+    card.textContent = "";
+
+    card.addEventListener("click", flipCard);
+    memoryBoard.appendChild(card);
+    cards.push(card);
+  });
+
+  // Start 1-minute countdown
+  timer = setInterval(() => {
+    timeRemaining--;
+    memoryStatus.textContent = `Matches: ${matches} / ${emojis.length} | Time: ${timeRemaining}s`;
+
+    if (timeRemaining <= 0) {
+      clearInterval(timer);
+      disableAllCards();
+      showMemoryModal("⏰ Time's Up! Game Over!");
+    }
+  }, 1000);
+}
+
+// -------------------------
+// Flip card logic
+// -------------------------
+function flipCard() {
+  if (this === firstCard || this.textContent || secondCard) return;
+
+  this.textContent = this.dataset.emoji;
+  this.style.background = "#fff";
+
+  if (!firstCard) {
+    firstCard = this;
+    return;
+  }
+
+  secondCard = this;
+
+  if (firstCard.dataset.emoji === secondCard.dataset.emoji) {
+    matches++;
+    memoryStatus.textContent = `Matches: ${matches} / ${emojis.length} | Time: ${timeRemaining}s`;
+
+    firstCard = null;
+    secondCard = null;
+
+    if (matches === emojis.length) {
+      clearInterval(timer);
+      setTimeout(() => {
+        showMemoryModal("🎉 Congratulations! You Win!");
+      }, 300);
+    }
+  } else {
+    setTimeout(() => {
+      firstCard.textContent = "";
+      secondCard.textContent = "";
+      firstCard.style.background = "#222";
+      secondCard.style.background = "#222";
+      firstCard = null;
+      secondCard = null;
+    }, 800);
+  }
+}
+
+// Disable all cards when game over
+function disableAllCards() {
+  cards.forEach(card => card.removeEventListener("click", flipCard));
+}
+
+
+// LOADING SCREEN SIMULATION
+const loadingScreen = document.getElementById("loadingScreen");
+const loadingProgress = document.getElementById("loadingProgress");
+let loadPercent = 0;
+
+function simulateLoading() {
+  const interval = setInterval(() => {
+    loadPercent += Math.floor(Math.random() * 5) + 1; // random increment
+    if (loadPercent > 100) loadPercent = 100;
+    loadingProgress.textContent = loadPercent + "%";
+
+    if (loadPercent >= 100) {
+      clearInterval(interval);
+      loadingScreen.style.display = "none"; // hide loading
+      home.style.display = "flex"; // show home screen
+    }
+  }, 100); // every 0.1s
+}
+
+simulateLoading();
+</script>
+</body>
+</html>
